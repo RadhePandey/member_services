@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Virtual environment
+venv/
+
+# Test execution artifacts (regenerated on every run)
+reports/
+screenshots/
+
+# Editor/OS
+.vscode/
+.DS_Store
+Thumbs.db
