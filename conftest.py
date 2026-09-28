@@ -12,12 +12,18 @@ import pytest
 from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import sync_playwright
 
-from config import BROWSER_HEADLESS, BROWSER_KEEP_OPEN, BROWSER_SLOW_MO
+from config import (
+    BROWSER_HEADLESS,
+    BROWSER_KEEP_OPEN,
+    BROWSER_RECORD_VIDEO,
+    BROWSER_SLOW_MO,
+)
 from reporting.summary_report import generate_summary_report
 
 
 SCREENSHOTS_DIR = Path(__file__).resolve().parent / "screenshots"
 REPORTS_DIR = Path(__file__).resolve().parent / "reports"
+VIDEOS_DIR = Path(__file__).resolve().parent / "videos"
 
 _LOGIN_STEP_PATTERN = re.compile(r"Enter login email:\s*(\S+)")
 _SESSION_RESULTS = []
@@ -232,6 +238,10 @@ def page():
             context_options["no_viewport"] = True
         else:
             context_options["viewport"] = {"width": 1920, "height": 900}
+        if BROWSER_RECORD_VIDEO:
+            VIDEOS_DIR.mkdir(parents=True, exist_ok=True)
+            context_options["record_video_dir"] = str(VIDEOS_DIR)
+            context_options["record_video_size"] = {"width": 1280, "height": 720}
 
         context = browser.new_context(**context_options)
         page = context.new_page()

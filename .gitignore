@@ -9,6 +9,7 @@ venv/
 # Test execution artifacts (regenerated on every run)
 reports/
 screenshots/
+videos/
 
 # Editor/OS
 .vscode/

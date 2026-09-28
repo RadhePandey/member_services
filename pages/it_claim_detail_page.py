@@ -16,6 +16,7 @@ class ITClaimDetailPage(BasePage):
             "//*[normalize-space(.)='Digital - (Revenue)']/following::input[1]"
         ).first
         self.note_editor = page.locator("[contenteditable='true']").last
+        self.item_remark_field = page.get_by_placeholder("Remark").first
         self.forward_user_dropdown = page.locator("select:visible").last
         self.forward_button = page.locator(
             "//*[@id='app']//button[normalize-space(.)='Forward']"
@@ -75,6 +76,17 @@ class ITClaimDetailPage(BasePage):
         self.note_editor.fill(note)
         self.page.wait_for_timeout(1000)
         assert note in self.note_editor.inner_text(), "Claim note was not entered."
+
+    def add_item_remark(self, remark: str):
+        """Fill the per-item Remarks box in the Details table.
+
+        The app now requires this field (separate from the general Note
+        editor) before a claim can be forwarded, otherwise it shows
+        "Please add remark/note for claim item.".
+        """
+        self.log_step("Add the claim item remark")
+        self.item_remark_field.fill(remark)
+        self.page.wait_for_timeout(500)
 
     def select_reviewer_and_forward(self, reviewer: str):
         self.select_user_and_forward(reviewer, "Add the Initiator note")
@@ -163,13 +175,35 @@ class ITClaimDetailPage(BasePage):
             "'The claim has been approved successfully')]"
         ).first
         success_message.wait_for(state="visible", timeout=180000)
-        self.page.wait_for_timeout(500)
+        # Let the success popup's open animation fully settle before
+        # interacting with it; clicking too early can hit a backdrop
+        # overlay that is still fading in, or an OK button that gets
+        # re-rendered mid-click (stale-element race).
+        self.page.wait_for_timeout(1500)
         self.log_step("Claim approved successfully popup displayed")
         ok_button = self.page.locator(
             '//button[normalize-space(.)="OK"]'
         ).last
-        ok_button.wait_for(state="visible", timeout=10000)
-        ok_button.click()
+        last_error = None
+        for attempt in range(3):
+            try:
+                ok_button = self.page.locator(
+                    '//button[normalize-space(.)="OK"]'
+                ).last
+                ok_button.wait_for(state="visible", timeout=10000)
+                ok_button.click(timeout=10000)
+                last_error = None
+                break
+            except Exception as exc:  # noqa: BLE001 - retry on any click failure
+                last_error = exc
+                self.page.wait_for_timeout(1000)
+        if last_error is not None:
+            # Fall back to a forced click once the button has had time to
+            # stabilise, bypassing the transient overlay interception.
+            ok_button = self.page.locator(
+                '//button[normalize-space(.)="OK"]'
+            ).last
+            ok_button.click(force=True, timeout=10000)
         self.page.wait_for_timeout(500)
 
     def wait_for_esign_notification(self):

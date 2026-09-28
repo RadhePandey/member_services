@@ -24,3 +24,7 @@ IT_CLAIM_INVOICE_IMAGE = os.getenv(
 BROWSER_HEADLESS = os.getenv("BROWSER_HEADLESS", "true").lower() == "true"
 BROWSER_SLOW_MO = float(os.getenv("BROWSER_SLOW_MO", "0"))
 BROWSER_KEEP_OPEN = os.getenv("BROWSER_KEEP_OPEN", "false").lower() == "true"
+# When enabled, records a .webm video of every test's browser session so the
+# run can be watched/shared afterwards even in environments where the headed
+# browser window isn't visible on screen. Videos are saved under VIDEOS_DIR.
+BROWSER_RECORD_VIDEO = os.getenv("BROWSER_RECORD_VIDEO", "false").lower() == "true"

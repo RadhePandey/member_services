@@ -76,6 +76,7 @@ def test_user_can_submit_valid_it_equipment_claim(page: Page):
     assert detail.is_loaded(), "Submitted claim detail should be displayed"
     detail.fill_distribution("1000", "1000", "3998")
     detail.add_note("Initiator review completed.")
+    detail.add_item_remark("Initiator item remark.")
     detail.select_user_and_forward("Prabhat Kiran SDS")
 
     page.wait_for_timeout(1000)
@@ -102,6 +103,7 @@ def test_user_can_submit_valid_it_equipment_claim(page: Page):
     assert reviewer_detail.is_loaded()
     reviewer_detail.validate_distribution("3998")
     reviewer_detail.add_note("Reviewer review completed.")
+    reviewer_detail.add_item_remark("Reviewer item remark.")
     reviewer_detail.select_user_and_forward("RadhePandey")
 
 
@@ -163,6 +165,7 @@ def test_initiator_forwards_radha_claim_to_radhe_pandey(page: Page):
     assert detail.is_loaded()
     detail.fill_distribution("1000", "1000", "3998")
     detail.add_note("Initiator review completed.")
+    detail.add_item_remark("Initiator item remark.")
     detail.select_user_and_forward("Prabhat Kiran SDS")
 
 
@@ -184,6 +187,7 @@ def test_reviewer_forwards_claim_to_approver(page: Page):
     assert reviewer_detail.is_loaded()
     reviewer_detail.validate_distribution("3998")
     reviewer_detail.add_note("Reviewer review completed.")
+    reviewer_detail.add_item_remark("Reviewer item remark.")
     reviewer_detail.select_user_and_forward("RadhePandey")
 
 
