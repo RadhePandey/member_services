@@ -8,7 +8,7 @@ INITIATOR_EMAIL = os.getenv(
     "INITIATOR_EMAIL", "mohd.afroj@rajyasabha.digital"
 )
 REVIEWER_EMAIL = os.getenv(
-    "REVIEWER_EMAIL", "prabhat.kiran@rajyasabha.digital"
+    "REVIEWER_EMAIL", "kaushalendra.panday@rajyasabha.digital"
 )
 APPROVER_EMAIL = os.getenv("APPROVER_EMAIL", "claim.rev@rajyasabha.digital")
 TEST_LOGIN_ALT_EMAIL = os.getenv("TEST_LOGIN_ALT_EMAIL")
