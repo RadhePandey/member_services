@@ -11,6 +11,12 @@ if not exist "venv\Scripts\python.exe" (
 if not exist "reports" mkdir "reports"
 if not exist "screenshots" mkdir "screenshots"
 
+rem Demo mode: visible browser and a pause before every action so each
+rem step is easy to follow on screen. Override by setting these first,
+rem e.g. "set BROWSER_SLOW_MO=0" for a fast run.
+if not defined BROWSER_HEADLESS set "BROWSER_HEADLESS=false"
+if not defined BROWSER_SLOW_MO set "BROWSER_SLOW_MO=800"
+
 set "PYTHON=venv\Scripts\python.exe"
 
 for /f %%i in ('powershell -NoProfile -Command "Get-Date -Format yyyyMMdd_HHmmss"') do set "E2E_RUN_ID=%%i"

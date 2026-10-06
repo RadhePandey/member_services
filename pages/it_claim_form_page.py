@@ -20,12 +20,8 @@ class ITClaimFormPage(BasePage):
         self.category_field = page.locator(
             "//input[@placeholder='Enter Category name']"
         )
-        self.quantity_field = page.locator(
-            "(//input[@type='number'])[1]"
-        )
-        self.price_field = page.locator(
-            "(//input[@type='number'])[2]"
-        )
+        self.quantity_field = page.get_by_placeholder("Quantity", exact=True)
+        self.price_field = page.get_by_placeholder("Price", exact=True)
         self.description_field = page.locator(
             "//textarea[@placeholder='Enter description'] | //input[@placeholder='Enter description']"
         )

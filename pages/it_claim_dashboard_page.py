@@ -1,3 +1,5 @@
+import re
+
 from playwright.sync_api import Page, TimeoutError as PlaywrightTimeoutError
 
 from pages.base_page import BasePage
@@ -28,50 +30,51 @@ class ITClaimDashboardPage(BasePage):
         self.log_step("Click Add Claim")
         self.add_claim_link.click()
 
-    def open_claim_for_member(self, member_name: str):
-        self.log_step(f"Open latest submitted claim for member: {member_name}")
-        self.dismiss_blocking_notification()
-        claim_rows = self.page.locator("xpath=//*[@id='app']//tr").filter(
-            has_text=member_name
-        ).filter(has_text="Submitted")
-        claim_row = claim_rows.first
-        claim_row.wait_for(state="visible", timeout=30000)
-        status_cell = claim_row.locator(
-            "xpath=.//span[normalize-space(.)='Submitted']/ancestor::td[1]"
-        )
-        assert status_cell.inner_text().strip() == "Submitted", (
-            f"Expected claim status Submitted, found: {status_cell.inner_text().strip()}"
-        )
-        status_cell.hover()
-        open_button = status_cell.get_by_role("button", name="Open")
-        open_button.wait_for(state="visible", timeout=10000)
-        open_button.click(force=True)
-        self.page.wait_for_timeout(1000)
-        self.log_step(f"Claim detail URL after opening: {self.page.url}")
-
     def open_latest_claim_assigned_to_me(
         self, member_name: str, expected_status: str
     ):
-        status_description = (
-            f" with status {expected_status}" if expected_status else ""
-        )
+        """Open the member's claim with the given status and return its
+        claim number. A member can only have one open claim at a time, so
+        member + status identifies a single claim."""
         self.log_step(
             f"Open the latest claim for {member_name} in Assigned to Me"
-            f"{status_description}"
+            f" with status {expected_status}"
         )
+        claim_rows = self._claim_rows(expected_status).filter(has_text=member_name)
+        return self._open_claim_row(
+            claim_rows,
+            expected_status,
+            f"No claim for {member_name} with status {expected_status} "
+            f"in Assigned to Me",
+        )
+
+    def open_claim_by_number(self, claim_number: str, expected_status: str):
+        """Open the claim with the given claim number (e.g. 000000002966)."""
+        self.log_step(
+            f"Open claim number {claim_number} in Assigned to Me"
+            f" with status {expected_status}"
+        )
+        claim_rows = self._claim_rows(expected_status).filter(has_text=claim_number)
+        return self._open_claim_row(
+            claim_rows,
+            expected_status,
+            f"Claim number {claim_number} with status {expected_status} "
+            f"is not in Assigned to Me",
+        )
+
+    def _claim_rows(self, expected_status: str):
         self.dismiss_blocking_notification()
-        all_rows = self.page.locator("//*[@id='app']//tbody/tr")
-        claim_rows = all_rows.filter(
-            has_text=member_name
-        ).filter(has_text=expected_status)
-        if claim_rows.count() == 0:
-            self.log_step(
-                f"Member text is not shown; open the top Assigned to Me "
-                f"claim with status {expected_status}"
-            )
-            claim_rows = all_rows.filter(has_text=expected_status)
+        return self.page.locator("//*[@id='app']//tbody/tr").filter(
+            has_text=expected_status
+        )
+
+    def _open_claim_row(self, claim_rows, expected_status: str, not_found: str):
         claim_row = claim_rows.first
-        claim_row.wait_for(state="visible", timeout=30000)
+        try:
+            claim_row.wait_for(state="visible", timeout=30000)
+        except PlaywrightTimeoutError:
+            raise AssertionError(not_found) from None
+        claim_number = self._claim_number_from_row(claim_row)
         status_cell = claim_row.locator(
             f"xpath=.//span[normalize-space(.)='{expected_status}']/ancestor::td[1]"
         )
@@ -86,23 +89,15 @@ class ITClaimDashboardPage(BasePage):
         open_button.wait_for(state="visible", timeout=10000)
         open_button.click(force=True)
         self.page.wait_for_timeout(1000)
-        self.log_step(f"Claim detail URL after opening: {self.page.url}")
+        self.log_step(
+            f"Opened claim number {claim_number}; detail URL: {self.page.url}"
+        )
+        return claim_number
 
-    def open_first_claim_assigned_to_me(self, expected_status: str = None):
-        """Compatibility wrapper for callers that do not have member criteria."""
-        self.log_step(f"Open the first claim in Assigned to Me with status {expected_status}")
-        self.dismiss_blocking_notification()
-        claim_rows = self.page.locator("//*[@id='app']//tbody/tr")
-        if expected_status:
-            claim_rows = claim_rows.filter(has_text=expected_status)
-        claim_row = claim_rows.last if expected_status else claim_rows.first
-        claim_row.wait_for(state="visible", timeout=30000)
-        claim_row.hover(force=True)
-        open_button = claim_row.get_by_role("button", name="Open").first
-        open_button.wait_for(state="visible", timeout=10000)
-        open_button.click(force=True)
-        self.page.wait_for_timeout(1000)
-        self.log_step(f"Claim detail URL after opening: {self.page.url}")
+    def _claim_number_from_row(self, claim_row):
+        match = re.search(r"\b\d{12}\b", claim_row.inner_text())
+        assert match, f"Claim number not found in row: {claim_row.inner_text()}"
+        return match.group(0)
 
     def dismiss_blocking_notification(self):
         if self.claim_rejected_popup.is_visible():

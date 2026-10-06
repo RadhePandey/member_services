@@ -1,7 +1,7 @@
 from decimal import Decimal
 import re
 
-from playwright.sync_api import Page
+from playwright.sync_api import Page, expect
 
 from pages.base_page import BasePage
 
@@ -9,12 +9,12 @@ from pages.base_page import BasePage
 class ITClaimDetailPage(BasePage):
     def __init__(self, page: Page):
         super().__init__(page)
-        self.ict_amount_field = page.locator(
-            "//*[normalize-space(.)='ICT - (Capital)']/following::input[1]"
-        ).first
-        self.digital_amount_field = page.locator(
-            "//*[normalize-space(.)='Digital - (Revenue)']/following::input[1]"
-        ).first
+        self.ict_amount_field = page.get_by_placeholder(
+            "Enter Capital Amount", exact=True
+        )
+        self.digital_amount_field = page.get_by_placeholder(
+            "Enter Revenue Amount", exact=True
+        )
         self.note_editor = page.locator("[contenteditable='true']").last
         self.item_remark_field = page.get_by_placeholder("Remark").first
         self.forward_user_dropdown = page.locator("select:visible").last
@@ -48,6 +48,10 @@ class ITClaimDetailPage(BasePage):
 
     def validate_distribution(self, claim_amount: str):
         claimed = Decimal(claim_amount)
+        # The input boxes render before the claim data loads; wait until the
+        # saved ICT/Digital amounts are populated before reading them.
+        expect(self.ict_amount_field).not_to_have_value("", timeout=30000)
+        expect(self.digital_amount_field).not_to_have_value("", timeout=30000)
         ict_text = self.ict_amount_field.input_value().strip()
         digital_text = self.digital_amount_field.input_value().strip()
         if not ict_text or not digital_text:
@@ -71,10 +75,15 @@ class ITClaimDetailPage(BasePage):
 
     def add_note(self, note: str):
         self.log_step("Add the claim note")
-        self.note_editor.click()
-        self.page.wait_for_timeout(1000)
-        self.note_editor.fill(note)
-        self.page.wait_for_timeout(1000)
+        # The editor can re-render while the claim loads and drop the typed
+        # text, so type the note a second time if it did not stick.
+        for _ in range(2):
+            self.note_editor.click()
+            self.page.wait_for_timeout(1000)
+            self.note_editor.fill(note)
+            self.page.wait_for_timeout(1000)
+            if note in self.note_editor.inner_text():
+                break
         assert note in self.note_editor.inner_text(), "Claim note was not entered."
 
     def add_item_remark(self, remark: str):
@@ -88,9 +97,6 @@ class ITClaimDetailPage(BasePage):
         self.item_remark_field.fill(remark)
         self.page.wait_for_timeout(500)
 
-    def select_reviewer_and_forward(self, reviewer: str):
-        self.select_user_and_forward(reviewer, "Add the Initiator note")
-
     def select_user_and_forward(self, user: str):
         self.log_step(f"Select user: {user}")
         self.forward_user_dropdown.select_option(label=user)
@@ -102,7 +108,18 @@ class ITClaimDetailPage(BasePage):
         save_and_continue = self.page.locator(
             "button:visible"
         ).filter(has_text=re.compile(r"^\s*Save\s+and\s+Continue\s*$", re.IGNORECASE)).last
-        save_and_continue.wait_for(state="visible", timeout=10000)
+        # The app may refuse to forward (e.g. "Payable amount should be less
+        # then or equal to available Division Budget") with an error popup
+        # instead of opening the templates; report its message if so.
+        error_popup = self.page.locator(
+            "div.swal2-popup.swal2-icon-error:visible"
+        )
+        save_and_continue.or_(error_popup).first.wait_for(
+            state="visible", timeout=10000
+        )
+        if error_popup.count():
+            message = error_popup.locator(".swal2-html-container").inner_text()
+            raise AssertionError(f"Application refused to forward the claim: {message}")
         self.page.wait_for_timeout(1000)
         save_and_continue.click()
         self.page.wait_for_timeout(1000)
