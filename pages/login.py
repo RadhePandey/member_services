@@ -1,4 +1,6 @@
-from playwright.sync_api import Page
+import re
+
+from playwright.sync_api import Page, expect
 
 from config import BASE_URL, QR_LOGIN_URL, TEST_EMAIL, TEST_OTP
 from pages.base_page import BasePage
@@ -19,8 +21,10 @@ class LoginPage(BasePage):
         self.verify_otp_button = page.locator(
             "//button[normalize-space(.)='Verify OTP']"
         )
-        self.resend_otp_button = page.locator(
-            "//button[contains(translate(normalize-space(.), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'resend otp')]"
+        # "Resend" is a span inside "Resend OTP in 00:59 Min". It becomes a
+        # clickable link (class cursor-pointer) once the 60s timer ends.
+        self.resend_otp_link = page.locator(
+            "//p/span[normalize-space(.)='Resend']"
         )
         self.otp_rate_limit_message = page.locator(
             "//*[contains(normalize-space(.), 'You can only request an OTP once every 1 minute')]"
@@ -60,9 +64,9 @@ class LoginPage(BasePage):
         self.log_step(f"Enter login email: {email}")
         self.wait_for_visible(self.email_input)
         self.email_input.fill(email)
+        self.entered_email = email
 
-    def click_send_otp(self):
-        self.log_step("Click Send OTP and wait for the OTP screen")
+    def _request_otp(self):
         self.wait_for_visible(self.send_otp_button)
         self.send_otp_button.click()
         self.page.wait_for_function(
@@ -73,27 +77,37 @@ class LoginPage(BasePage):
             || document.body.innerText.includes('User details are missing or invalid user')""",
             timeout=30000,
         )
+
+    def click_send_otp(self):
+        self.log_step("Click Send OTP and wait for the OTP screen")
+        self._request_otp()
+        if self.otp_rate_limit_message.is_visible():
+            # The app allows one OTP per user per minute. The same user can
+            # log in twice within a minute (e.g. consecutive stages), so wait
+            # it out and request the OTP again once from a fresh login page.
+            self.log_step(
+                "OTP request was rate-limited; wait 60 seconds and request again"
+            )
+            self.page.wait_for_timeout(60000)
+            self.open()
+            self.enter_email(getattr(self, "entered_email", TEST_EMAIL))
+            self._request_otp()
         if self.otp_rate_limit_message.is_visible():
             raise AssertionError(
-                "OTP request was rate-limited; wait 60 seconds before retrying."
+                "OTP request was still rate-limited after waiting 60 seconds."
             )
         if self.invalid_user_message.is_visible():
             raise AssertionError("Login user details are missing or invalid.")
         self.otp_inputs.first.wait_for(state="visible", timeout=30000)
 
-    def is_resend_otp_disabled(self):
-        self.resend_otp_button.wait_for(state="visible", timeout=30000)
-        return self.resend_otp_button.is_disabled()
+    def is_resend_otp_enabled(self):
+        self.resend_otp_link.wait_for(state="visible", timeout=30000)
+        return "cursor-pointer" in (self.resend_otp_link.get_attribute("class") or "")
 
     def wait_for_resend_otp(self):
-        self.resend_otp_button.wait_for(state="visible", timeout=30000)
-        self.page.wait_for_function(
-            """() => {
-                const button = [...document.querySelectorAll('button')]
-                    .find((element) => element.textContent.toLowerCase().includes('resend otp'));
-                return button && !button.disabled;
-            }""",
-            timeout=65000,
+        self.resend_otp_link.wait_for(state="visible", timeout=30000)
+        expect(self.resend_otp_link).to_have_class(
+            re.compile(r"\bcursor-pointer\b"), timeout=65000
         )
 
     def is_invalid_user_visible(self):

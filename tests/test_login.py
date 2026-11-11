@@ -29,6 +29,25 @@ def test_qr_login_screen_is_displayed(page: Page):
 
 
 @pytest.mark.regression
+def test_resend_otp_is_enabled_after_60_seconds(page: Page):
+    # The app allows one OTP per minute: Resend OTP stays disabled for 60
+    # seconds after an OTP is sent, then becomes clickable.
+    login_page = LoginPage(page)
+    login_page.open()
+    login_page.enter_email(TEST_EMAIL)
+    login_page.click_send_otp()
+
+    assert not login_page.is_resend_otp_enabled(), (
+        "Resend OTP should be disabled right after an OTP is sent"
+    )
+    login_page.log_step("Wait for the 60-second Resend OTP timer")
+    login_page.wait_for_resend_otp()
+    assert login_page.is_resend_otp_enabled(), (
+        "Resend OTP should be enabled after 60 seconds"
+    )
+
+
+@pytest.mark.regression
 @pytest.mark.skipif(
     not TEST_LOGIN_ALT_EMAIL,
     reason="Requires a second valid login email to avoid OTP resend throttling.",

@@ -41,6 +41,8 @@ _LOGIN_KEYWORDS = (
 )
 
 _CLAIM_SUBMISSION_KEYWORDS = (
+    "side menu",
+    "click medical claim",
     "click add claim",
     "search for member",
     "select member:",
@@ -56,6 +58,8 @@ _CLAIM_SUBMISSION_KEYWORDS = (
 )
 
 _APPROVAL_KEYWORDS = (
+    "for approval (current status",
+    "click e-sign & approve",
     "click review & approve",
     "save and continue approval",
     "confirm approval submission",
